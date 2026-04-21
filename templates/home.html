@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header class="hero">
+        <div class="container hero-grid">
+            <div>
+                <p class="eyebrow">Go + standard library</p>
+                <h1>Groupie Trackers</h1>
+                <p class="lede">Explore artists, members, album timelines, and concert relations from the official API.</p>
+                <div class="search-row">
+                    <input id="search-input" type="search" placeholder="Search by artist, member, year, location..." value="{{.Filter.Query}}" autocomplete="off">
+                    <button id="refresh-button" type="button">Refresh API data</button>
+                </div>
+                <p id="search-status" class="status-text">Client event: typing triggers a request to <code>/api/search</code>.</p>
+            </div>
+            <div class="stats-grid">
+                <article class="stat-card">
+                    <span>Total artists</span>
+                    <strong>{{.Stats.ArtistCount}}</strong>
+                </article>
+                <article class="stat-card">
+                    <span>Total concerts</span>
+                    <strong>{{.Stats.TotalConcerts}}</strong>
+                </article>
+                <article class="stat-card">
+                    <span>Unique locations</span>
+                    <strong>{{.Stats.UniqueLocations}}</strong>
+                </article>
+                <article class="stat-card">
+                    <span>Average group size</span>
+                    <strong>{{printf "%.1f" .Stats.AverageGroupSize}}</strong>
+                </article>
+            </div>
+        </div>
+    </header>
+
+    <main class="container page-section">
+        <div class="main-grid">
+
+            <!-- ── Filter panel ───────────────────────────────────────────── -->
+            <aside class="filter-panel panel">
+                <h2 class="filter-title">Filters</h2>
+
+                <div class="filter-group">
+                    <label class="filter-label">Creation date</label>
+                    <div class="range-row">
+                        <input id="creation-min" class="range-input" type="number" min="1950" max="2024" placeholder="From" value="{{if .Filter.CreationMin}}{{.Filter.CreationMin}}{{end}}">
+                        <span class="range-sep">–</span>
+                        <input id="creation-max" class="range-input" type="number" min="1950" max="2024" placeholder="To" value="{{if .Filter.CreationMax}}{{.Filter.CreationMax}}{{end}}">
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label">First album year</label>
+                    <div class="range-row">
+                        <input id="album-min" class="range-input" type="number" min="1950" max="2024" placeholder="From" value="{{if .Filter.FirstAlbumMin}}{{.Filter.FirstAlbumMin}}{{end}}">
+                        <span class="range-sep">–</span>
+                        <input id="album-max" class="range-input" type="number" min="1950" max="2024" placeholder="To" value="{{if .Filter.FirstAlbumMax}}{{.Filter.FirstAlbumMax}}{{end}}">
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label">Number of members</label>
+                    <div class="range-row">
+                        <input id="members-min" class="range-input" type="number" min="1" max="20" placeholder="Min" value="{{if .Filter.MembersMin}}{{.Filter.MembersMin}}{{end}}">
+                        <span class="range-sep">–</span>
+                        <input id="members-max" class="range-input" type="number" min="1" max="20" placeholder="Max" value="{{if .Filter.MembersMax}}{{.Filter.MembersMax}}{{end}}">
+                    </div>
+                    <div class="checkbox-group" id="members-checkboxes">
+                        {{range $n := .MemberCounts}}
+                        <label class="checkbox-label">
+                            <input type="checkbox" class="member-checkbox" value="{{$n}}"
+                                {{if and (ge $n $.Filter.MembersMin) (le $n $.Filter.MembersMax) (gt $.Filter.MembersMin 0)}}checked{{end}}>
+                            {{$n}}
+                        </label>
+                        {{end}}
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label">Concert location</label>
+                    <input id="location-input" class="range-input" type="text" placeholder="e.g. Texas, USA" value="{{.Filter.Location}}">
+                </div>
+
+                <button id="reset-button" type="button" class="reset-btn">Reset filters</button>
+            </aside>
+
+            <!-- ── Artist grid ────────────────────────────────────────────── -->
+            <section>
+                <div class="section-head">
+                    <h2>Artists</h2>
+                    <p id="result-count">{{len .Artists}} result(s)</p>
+                </div>
+                <div id="artists-grid" class="cards-grid">
+                    {{range .Artists}}
+                    <article class="artist-card">
+                        <img src="{{.Image}}" alt="{{.Name}} poster" loading="lazy">
+                        <div class="artist-card-body">
+                            <div class="title-row">
+                                <h3>{{.Name}}</h3>
+                                <span class="badge">{{.MemberCount}} members</span>
+                            </div>
+                            <ul class="meta-list">
+                                <li><strong>Created:</strong> {{.CreationDate}}</li>
+                                <li><strong>First album:</strong> {{.FirstAlbum}}</li>
+                                <li><strong>Locations:</strong> {{.LocationCount}}</li>
+                                <li><strong>Concert dates:</strong> {{.ConcertCount}}</li>
+                            </ul>
+                            <a class="button-link" href="/artist?id={{.ID}}">View details</a>
+                        </div>
+                    </article>
+                    {{else}}
+                    <p class="empty-state">No artists found.</p>
+                    {{end}}
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
