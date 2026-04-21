@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <main class="container page-section">
+        <a class="back-link" href="/">← Back to artists</a>
+
+        <section class="detail-hero">
+            <img class="detail-image" src="{{.Artist.Image}}" alt="{{.Artist.Name}} poster">
+            <div>
+                <p class="eyebrow">Artist details</p>
+                <h1>{{.Artist.Name}}</h1>
+                <div class="pill-row">
+                    <span class="pill">Created {{.Artist.CreationDate}}</span>
+                    <span class="pill">First album {{.Artist.FirstAlbum}}</span>
+                    <span class="pill">{{.Artist.MemberCount}} members</span>
+                    <span class="pill">{{.Artist.LocationCount}} locations</span>
+                </div>
+                <p class="lede">Concert relations are built from the API's <code>relation</code> endpoint to connect locations and dates.</p>
+            </div>
+        </section>
+
+        <section class="content-grid">
+            <article class="panel">
+                <h2>Members</h2>
+                <ul class="member-list">
+                    {{range .Artist.Members}}
+                    <li>{{.}}</li>
+                    {{end}}
+                </ul>
+            </article>
+
+            <article class="panel">
+                <h2>Concert relations</h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Location</th>
+                                <th>Dates</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{range .Artist.Concerts}}
+                            <tr>
+                                <td>{{.Location}}</td>
+                                <td>
+                                    {{range $index, $date := .Dates}}{{if $index}}, {{end}}{{$date}}{{end}}
+                                </td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                </div>
+            </article>
+        </section>
+    </main>
+</body>
+</html>
