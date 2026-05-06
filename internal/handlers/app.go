@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"groupie-tracker/internal/geo"
 	"groupie-tracker/internal/service"
 )
 
@@ -18,6 +19,7 @@ import (
 type App struct {
 	repo      *service.Repository
 	templates *template.Template
+	geocoder  *geo.Geocoder
 }
 
 // HomePageData is the template data passed to home.html.
@@ -44,7 +46,7 @@ type ErrorPageData struct {
 
 // NewApp creates an App with the given repository and parsed templates.
 func NewApp(repo *service.Repository, templates *template.Template) *App {
-	return &App{repo: repo, templates: templates}
+	return &App{repo: repo, templates: templates, geocoder: geo.NewGeocoder()}
 }
 
 // Home handles GET / and renders the artist grid.
@@ -122,6 +124,58 @@ func (a *App) Search(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"failed to encode response"}`, http.StatusInternalServerError)
 		return
 	}
+}
+
+// GeocodeConcerts handles GET /api/geocode?id=<n> and returns a JSON array of
+// concert locations with their geographic coordinates, used to render the map
+// on the artist detail page. Locations that cannot be geocoded are omitted.
+func (a *App) GeocodeConcerts(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	id, err := strconv.Atoi(r.URL.Query().Get("id"))
+	if err != nil || id <= 0 {
+		http.Error(w, `{"error":"invalid id"}`, http.StatusBadRequest)
+		return
+	}
+
+	artist, err := a.repo.ByID(id)
+	if err != nil {
+		http.Error(w, `{"error":"artist not found"}`, http.StatusNotFound)
+		return
+	}
+
+	type concertPoint struct {
+		Location string   `json:"location"`
+		Lat      float64  `json:"lat"`
+		Lon      float64  `json:"lon"`
+		Dates    []string `json:"dates"`
+	}
+
+	// Collect location strings and geocode them all concurrently.
+	locations := make([]string, len(artist.Concerts))
+	for i, c := range artist.Concerts {
+		locations[i] = c.Location
+	}
+	geoResults := a.geocoder.GeocodeAll(locations)
+
+	var points []concertPoint
+	for i, concert := range artist.Concerts {
+		if geoResults[i] == nil {
+			continue
+		}
+		points = append(points, concertPoint{
+			Location: concert.Location,
+			Lat:      geoResults[i].Lat,
+			Lon:      geoResults[i].Lon,
+			Dates:    concert.Dates,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_ = json.NewEncoder(w).Encode(points)
 }
 
 // Refresh handles POST /api/refresh and re-fetches all data from the upstream API.
