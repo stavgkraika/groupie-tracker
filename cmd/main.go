@@ -42,6 +42,7 @@ func main() {
 	mux.HandleFunc("/artist", app.Artist)
 	mux.HandleFunc("/api/search", app.Search)
 	mux.HandleFunc("/api/refresh", app.Refresh)
+	mux.HandleFunc("/api/geocode", app.GeocodeConcerts)
 
 	server := &http.Server{
 		Addr:              addr,
