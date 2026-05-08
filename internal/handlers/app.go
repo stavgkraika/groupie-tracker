@@ -126,6 +126,22 @@ func (a *App) Search(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Suggest handles GET /api/suggest?q=<text> and returns typed autocomplete
+// suggestions for the home page search input.
+func (a *App) Suggest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	suggestions := a.repo.Suggestions(r.URL.Query().Get("q"), 10)
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	if err := json.NewEncoder(w).Encode(suggestions); err != nil {
+		http.Error(w, `{"error":"failed to encode response"}`, http.StatusInternalServerError)
+		return
+	}
+}
+
 // GeocodeConcerts handles GET /api/geocode?id=<n> and returns a JSON array of
 // concert locations with their geographic coordinates, used to render the map
 // on the artist detail page. Locations that cannot be geocoded are omitted.

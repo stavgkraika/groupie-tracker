@@ -41,6 +41,7 @@ func main() {
 	mux.HandleFunc("/", app.Home)
 	mux.HandleFunc("/artist", app.Artist)
 	mux.HandleFunc("/api/search", app.Search)
+	mux.HandleFunc("/api/suggest", app.Suggest)
 	mux.HandleFunc("/api/refresh", app.Refresh)
 	mux.HandleFunc("/api/geocode", app.GeocodeConcerts)
 

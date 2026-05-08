@@ -188,6 +188,42 @@ func TestSearch_MethodNotAllowed(t *testing.T) {
 	}
 }
 
+func TestSuggest_ReturnsTypedJSON(t *testing.T) {
+	repo := service.NewRepository(nil)
+	repo.LoadForTest(
+		[]api.Artist{{ID: 1, Name: "Queen", Members: []string{"Freddie Mercury"}, FirstAlbum: "14-12-1973"}},
+		[]api.Relation{{ID: 1, DatesLocations: map[string][]string{"osaka-japan": {"28-01-2020"}}}},
+	)
+	tmpl := template.Must(template.New("").Parse(stubTemplates))
+	app := NewApp(repo, tmpl)
+
+	w := get(app.Suggest, "/api/suggest?q=osaka")
+	if w.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200", w.Code)
+	}
+
+	var suggestions []service.Suggestion
+	if err := json.NewDecoder(w.Body).Decode(&suggestions); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+	if len(suggestions) != 1 {
+		t.Fatalf("got %d suggestions, want 1", len(suggestions))
+	}
+	if suggestions[0].Value != "Osaka, Japan" || suggestions[0].Role != "location" {
+		t.Fatalf("unexpected suggestion: %+v", suggestions[0])
+	}
+}
+
+func TestSuggest_MethodNotAllowed(t *testing.T) {
+	app := newApp(t)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/api/suggest?q=queen", nil)
+	app.Suggest(w, r)
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("got %d, want 405", w.Code)
+	}
+}
+
 // ── Refresh ───────────────────────────────────────────────────────────────────
 
 func TestRefresh_MethodNotAllowed(t *testing.T) {
@@ -205,18 +241,37 @@ func TestParseFilter(t *testing.T) {
 		"/?q=queen&creation_min=1970&creation_max=2000&album_min=1973&album_max=1980&members_min=2&members_max=5&location=texas",
 		nil)
 	f := parseFilter(r)
-	if f.Query != "queen"   { t.Errorf("Query: got %q", f.Query) }
-	if f.CreationMin != 1970 { t.Errorf("CreationMin: got %d", f.CreationMin) }
-	if f.CreationMax != 2000 { t.Errorf("CreationMax: got %d", f.CreationMax) }
-	if f.FirstAlbumMin != 1973 { t.Errorf("FirstAlbumMin: got %d", f.FirstAlbumMin) }
-	if f.FirstAlbumMax != 1980 { t.Errorf("FirstAlbumMax: got %d", f.FirstAlbumMax) }
-	if f.MembersMin != 2    { t.Errorf("MembersMin: got %d", f.MembersMin) }
-	if f.MembersMax != 5    { t.Errorf("MembersMax: got %d", f.MembersMax) }
-	if f.Location != "texas" { t.Errorf("Location: got %q", f.Location) }
+	if f.Query != "queen" {
+		t.Errorf("Query: got %q", f.Query)
+	}
+	if f.CreationMin != 1970 {
+		t.Errorf("CreationMin: got %d", f.CreationMin)
+	}
+	if f.CreationMax != 2000 {
+		t.Errorf("CreationMax: got %d", f.CreationMax)
+	}
+	if f.FirstAlbumMin != 1973 {
+		t.Errorf("FirstAlbumMin: got %d", f.FirstAlbumMin)
+	}
+	if f.FirstAlbumMax != 1980 {
+		t.Errorf("FirstAlbumMax: got %d", f.FirstAlbumMax)
+	}
+	if f.MembersMin != 2 {
+		t.Errorf("MembersMin: got %d", f.MembersMin)
+	}
+	if f.MembersMax != 5 {
+		t.Errorf("MembersMax: got %d", f.MembersMax)
+	}
+	if f.Location != "texas" {
+		t.Errorf("Location: got %q", f.Location)
+	}
 }
 
 func TestQueryInt(t *testing.T) {
-	cases := []struct{ in string; want int }{
+	cases := []struct {
+		in   string
+		want int
+	}{
 		{"42", 42}, {"0", 0}, {"-1", 0}, {"abc", 0}, {"", 0}, {" 7 ", 7},
 	}
 	for _, tc := range cases {

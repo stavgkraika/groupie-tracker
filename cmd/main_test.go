@@ -60,6 +60,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 	mux.HandleFunc("/", app.Home)
 	mux.HandleFunc("/artist", app.Artist)
 	mux.HandleFunc("/api/search", app.Search)
+	mux.HandleFunc("/api/suggest", app.Suggest)
 	mux.HandleFunc("/api/refresh", app.Refresh)
 
 	return httptest.NewServer(app.RecoverMiddleware(app.LoggingMiddleware(mux)))
@@ -86,6 +87,8 @@ func TestRoutes(t *testing.T) {
 		{http.MethodGet, "/artist?id=99999", http.StatusNotFound},
 		// Search with no query returns 200 (empty result set)
 		{http.MethodGet, "/api/search", http.StatusOK},
+		// Suggestions with no query returns 200 (empty result set)
+		{http.MethodGet, "/api/suggest", http.StatusOK},
 		// Refresh requires POST
 		{http.MethodGet, "/api/refresh", http.StatusMethodNotAllowed},
 	}

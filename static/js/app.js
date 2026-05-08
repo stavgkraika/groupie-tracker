@@ -7,6 +7,7 @@
   const status         = document.getElementById("search-status");
   const refreshButton  = document.getElementById("refresh-button");
   const resetButton    = document.getElementById("reset-button");
+  const suggestionsBox = document.getElementById("search-suggestions");
   const creationMin    = document.getElementById("creation-min");
   const creationMax    = document.getElementById("creation-max");
   const albumMin       = document.getElementById("album-min");
@@ -20,8 +21,10 @@
   // controller holds the AbortController for the in-flight request so it can be
   // cancelled when a new input event arrives before the response returns.
   let controller = null;
+  let suggestController = null;
   // debounceId holds the setTimeout handle used to debounce rapid input events.
   let debounceId = null;
+  let suggestDebounceId = null;
 
   // ── Event listeners ────────────────────────────────────────────────────────
 
@@ -33,6 +36,15 @@
 
   filterInputs.forEach(function (el) {
     el.addEventListener("input", scheduleSearch);
+  });
+
+  searchInput.addEventListener("input", scheduleSuggestions);
+  searchInput.addEventListener("focus", scheduleSuggestions);
+  searchInput.addEventListener("keydown", handleSuggestionKeys);
+
+  document.addEventListener("click", function (event) {
+    if (!suggestionsBox || event.target === searchInput || suggestionsBox.contains(event.target)) return;
+    hideSuggestions();
   });
 
   // Checkboxes sync to the min/max number inputs and trigger a search.
@@ -66,6 +78,7 @@
       document.querySelectorAll(".member-checkbox").forEach(function (cb) {
         cb.checked = false;
       });
+      hideSuggestions();
       runSearch();
     });
   }
@@ -75,6 +88,11 @@
   function scheduleSearch() {
     clearTimeout(debounceId);
     debounceId = window.setTimeout(runSearch, 250);
+  }
+
+  function scheduleSuggestions() {
+    clearTimeout(suggestDebounceId);
+    suggestDebounceId = window.setTimeout(loadSuggestions, 120);
   }
 
   // When checkboxes change, set the min/max number inputs to the lowest and
@@ -135,6 +153,104 @@
       // Ignore aborted requests — expected when the user types quickly.
       if (error.name === "AbortError") return;
       status.textContent = "Search failed. Try again.";
+    }
+  }
+
+  async function loadSuggestions() {
+    if (!suggestionsBox) return;
+
+    const q = searchInput.value.trim();
+    if (!q) {
+      hideSuggestions();
+      return;
+    }
+
+    if (suggestController) suggestController.abort();
+    suggestController = new AbortController();
+
+    try {
+      const response = await fetch("/api/suggest?q=" + encodeURIComponent(q), {
+        signal: suggestController.signal,
+      });
+      if (!response.ok) throw new Error("suggest failed");
+
+      const suggestions = await response.json();
+      renderSuggestions(suggestions);
+    } catch (error) {
+      if (error.name === "AbortError") return;
+      hideSuggestions();
+    }
+  }
+
+  function renderSuggestions(suggestions) {
+    if (!suggestionsBox || !Array.isArray(suggestions) || suggestions.length === 0) {
+      hideSuggestions();
+      return;
+    }
+
+    suggestionsBox.innerHTML = suggestions.map(function (suggestion, index) {
+      const context = suggestion.artistName && suggestion.artistName !== suggestion.value
+        ? '<span class="suggestion-context">' + escapeHTML(suggestion.artistName) + '</span>'
+        : "";
+      return (
+        '<button class="suggestion-item" type="button" role="option" data-value="' +
+          escapeHTML(suggestion.value) + '" aria-selected="' + (index === 0 ? 'true' : 'false') + '">' +
+          '<span class="suggestion-main">' +
+            '<span class="suggestion-value">' + escapeHTML(suggestion.value) + '</span>' +
+            context +
+          '</span>' +
+          '<span class="suggestion-role">' + escapeHTML(suggestion.role) + '</span>' +
+        '</button>'
+      );
+    }).join("");
+
+    suggestionsBox.hidden = false;
+    searchInput.setAttribute("aria-expanded", "true");
+
+    suggestionsBox.querySelectorAll(".suggestion-item").forEach(function (button) {
+      button.addEventListener("mousedown", function (event) {
+        event.preventDefault();
+        applySuggestion(button.dataset.value);
+      });
+    });
+  }
+
+  function hideSuggestions() {
+    if (!suggestionsBox) return;
+    suggestionsBox.hidden = true;
+    suggestionsBox.innerHTML = "";
+    searchInput.setAttribute("aria-expanded", "false");
+  }
+
+  function applySuggestion(value) {
+    searchInput.value = value;
+    hideSuggestions();
+    runSearch();
+    searchInput.focus();
+  }
+
+  function handleSuggestionKeys(event) {
+    if (!suggestionsBox || suggestionsBox.hidden) return;
+
+    const items = Array.from(suggestionsBox.querySelectorAll(".suggestion-item"));
+    if (items.length === 0) return;
+
+    const currentIndex = Math.max(0, items.findIndex(function (item) {
+      return item.getAttribute("aria-selected") === "true";
+    }));
+
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const offset = event.key === "ArrowDown" ? 1 : -1;
+      const nextIndex = (currentIndex + offset + items.length) % items.length;
+      items.forEach(function (item, index) {
+        item.setAttribute("aria-selected", String(index === nextIndex));
+      });
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      applySuggestion(items[currentIndex].dataset.value);
+    } else if (event.key === "Escape") {
+      hideSuggestions();
     }
   }
 

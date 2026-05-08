@@ -14,7 +14,10 @@
                 <h1>Groupie Trackers</h1>
                 <p class="lede">Explore artists, members, album timelines, and concert relations from the official API.</p>
                 <div class="search-row">
-                    <input id="search-input" type="search" placeholder="Search by artist, member, year, location..." value="{{.Filter.Query}}" autocomplete="off">
+                    <div class="search-box">
+                        <input id="search-input" type="search" placeholder="Search by artist, member, year, location..." value="{{.Filter.Query}}" autocomplete="off" aria-autocomplete="list" aria-controls="search-suggestions" aria-expanded="false">
+                        <div id="search-suggestions" class="suggestions-list" role="listbox" hidden></div>
+                    </div>
                     <button id="refresh-button" type="button">Refresh API data</button>
                 </div>
                 <p id="search-status" class="status-text">Client event: typing triggers a request to <code>/api/search</code>.</p>

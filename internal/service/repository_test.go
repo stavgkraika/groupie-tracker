@@ -66,3 +66,66 @@ func TestContainsArtist(t *testing.T) {
 		}
 	}
 }
+
+func TestSuggestionsReturnRolesAndDeduplicate(t *testing.T) {
+	repo := NewRepository(nil)
+	repo.LoadForTest(
+		[]api.Artist{
+			{
+				ID:           1,
+				Name:         "Queen",
+				Members:      []string{"Freddie Mercury", "Brian May"},
+				CreationDate: 1970,
+				FirstAlbum:   "14-12-1973",
+			},
+			{
+				ID:           2,
+				Name:         "Adele",
+				Members:      []string{"Adele"},
+				CreationDate: 2006,
+				FirstAlbum:   "19-01-2008",
+			},
+		},
+		[]api.Relation{
+			{ID: 1, DatesLocations: map[string][]string{"osaka-japan": {"28-01-2020"}}},
+			{ID: 2, DatesLocations: map[string][]string{"london-uk": {"14-02-2021"}}},
+		},
+	)
+
+	cases := []struct {
+		query string
+		value string
+		role  string
+	}{
+		{"queen", "Queen", "band"},
+		{"adele", "Adele", "artist"},
+		{"freddie", "Freddie Mercury", "member"},
+		{"osaka", "Osaka, Japan", "location"},
+		{"1973", "1973", "album year"},
+		{"1970", "1970", "creation year"},
+		{"2020", "28-01-2020", "concert date"},
+	}
+
+	for _, tc := range cases {
+		suggestions := repo.Suggestions(tc.query, 10)
+		if !hasSuggestion(suggestions, tc.value, tc.role) {
+			t.Fatalf("Suggestions(%q) missing %q/%q in %+v", tc.query, tc.value, tc.role, suggestions)
+		}
+	}
+
+	if got := repo.Suggestions("", 10); len(got) != 0 {
+		t.Fatalf("empty query returned %d suggestions, want 0", len(got))
+	}
+	if got := repo.Suggestions("a", 2); len(got) > 2 {
+		t.Fatalf("limit was not respected: got %d suggestions", len(got))
+	}
+}
+
+func hasSuggestion(suggestions []Suggestion, value, role string) bool {
+	for _, suggestion := range suggestions {
+		if suggestion.Value == value && suggestion.Role == role {
+			return true
+		}
+	}
+	return false
+}

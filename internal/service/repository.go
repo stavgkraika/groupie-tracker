@@ -47,6 +47,14 @@ type Concert struct {
 	Dates    []string `json:"dates"`
 }
 
+// Suggestion is a typed autocomplete result for the home page search box.
+type Suggestion struct {
+	Value      string `json:"value"`
+	Role       string `json:"role"`
+	ArtistID   int    `json:"artistId,omitempty"`
+	ArtistName string `json:"artistName,omitempty"`
+}
+
 // Stats holds aggregate figures computed across all artists during a refresh.
 type Stats struct {
 	ArtistCount      int
@@ -134,14 +142,14 @@ func (r *Repository) ByID(id int) (ArtistView, error) {
 // Filter holds the optional range and checkbox constraints for the filter panel.
 // Zero values mean "no constraint" for that field.
 type Filter struct {
-	Query           string // free-text search
-	CreationMin     int    // creation date >= CreationMin (0 = no lower bound)
-	CreationMax     int    // creation date <= CreationMax (0 = no upper bound)
-	FirstAlbumMin   int    // first album year >= FirstAlbumMin
-	FirstAlbumMax   int    // first album year <= FirstAlbumMax
-	MembersMin      int    // member count >= MembersMin
-	MembersMax      int    // member count <= MembersMax
-	Location        string // concert location contains this string (case-insensitive)
+	Query         string // free-text search
+	CreationMin   int    // creation date >= CreationMin (0 = no lower bound)
+	CreationMax   int    // creation date <= CreationMax (0 = no upper bound)
+	FirstAlbumMin int    // first album year >= FirstAlbumMin
+	FirstAlbumMax int    // first album year <= FirstAlbumMax
+	MembersMin    int    // member count >= MembersMin
+	MembersMax    int    // member count <= MembersMax
+	Location      string // concert location contains this string (case-insensitive)
 }
 
 // Search returns all artists whose name, members, creation year, first album,
@@ -149,6 +157,60 @@ type Filter struct {
 // An empty query returns all artists.
 func (r *Repository) Search(query string) []ArtistView {
 	return r.Filter(Filter{Query: query})
+}
+
+// Suggestions returns typed autocomplete matches for query, capped at limit.
+// It searches artists/bands, members, album years, creation years, concert
+// locations, and concert dates. An empty query returns no suggestions.
+func (r *Repository) Suggestions(query string, limit int) []Suggestion {
+	q := strings.TrimSpace(strings.ToLower(query))
+	if q == "" || limit <= 0 {
+		return nil
+	}
+
+	artists := r.All()
+	suggestions := make([]Suggestion, 0, limit)
+	seen := make(map[string]struct{})
+
+	add := func(value, role string, artist ArtistView) {
+		if len(suggestions) >= limit || !strings.Contains(strings.ToLower(value), q) {
+			return
+		}
+		key := strings.ToLower(role + "\x00" + value)
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		suggestions = append(suggestions, Suggestion{
+			Value:      value,
+			Role:       role,
+			ArtistID:   artist.ID,
+			ArtistName: artist.Name,
+		})
+	}
+
+	for _, artist := range artists {
+		artistRole := "artist"
+		if artist.MemberCount > 1 {
+			artistRole = "band"
+		}
+		add(artist.Name, artistRole, artist)
+		add(artist.FirstAlbum, "album", artist)
+		add(strconv.Itoa(artist.FirstAlbumYear), "album year", artist)
+		add(strconv.Itoa(artist.CreationDate), "creation year", artist)
+
+		for _, member := range artist.Members {
+			add(member, "member", artist)
+		}
+		for _, concert := range artist.Concerts {
+			add(concert.Location, "location", artist)
+			for _, date := range concert.Dates {
+				add(date, "concert date", artist)
+			}
+		}
+	}
+
+	return suggestions
 }
 
 // Filter applies all non-zero constraints in f and returns the matching artists.
