@@ -9,7 +9,7 @@
 </head>
 <body>
     <main class="container page-section">
-        <a class="back-link" href="/">← Back to artists</a>
+        <a class="back-link" href="/">Back to artists</a>
 
         <section class="detail-hero">
             <img class="detail-image" src="{{.Artist.Image}}" alt="{{.Artist.Name}} poster">
@@ -67,17 +67,17 @@
 
         <section class="panel map-section">
             <h2>Concert locations map</h2>
-            <div id="concert-map" style="width:100%;height:480px;"></div>
-            <p id="map-status" class="lede">Loading map…</p>
+            <div id="concert-map" data-artist-id="{{.Artist.ID}}"></div>
+            <p id="map-status" class="lede">Loading map...</p>
         </section>
     </main>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
     (function () {
-        const artistId = {{.Artist.ID}};
         const mapEl    = document.getElementById("concert-map");
         const statusEl = document.getElementById("map-status");
+        const artistId = mapEl.dataset.artistId;
         const locationLinks = document.querySelectorAll(".location-link");
         const markersByLocation = new Map();
 
@@ -111,7 +111,9 @@
                 points.forEach(function (p) {
                     const popup = "<strong>" + escapeHTML(p.location) + "</strong><br>" +
                         (p.dates || []).map(escapeHTML).join(", ");
-                    const marker = L.marker([p.lat, p.lon]).addTo(map).bindPopup(popup);
+                    const marker = L.marker([p.lat, p.lon]).addTo(map).bindPopup(popup, {
+                        autoPan: false,
+                    });
                     markersByLocation.set(p.location, marker);
                     bounds.push([p.lat, p.lon]);
                 });
@@ -135,8 +137,14 @@
             }
 
             const latLng = marker.getLatLng();
-            map.setView(latLng, Math.max(map.getZoom(), 10), { animate: true });
+            const targetZoom = Math.max(map.getZoom(), 10);
+            map.invalidateSize({ pan: false });
+            map.setView(latLng, targetZoom, { animate: true });
             marker.openPopup();
+            setTimeout(function () {
+                map.invalidateSize({ pan: false });
+                map.setView(latLng, targetZoom, { animate: false });
+            }, 350);
             statusEl.textContent = "Showing " + location + " on the map.";
         }
 
